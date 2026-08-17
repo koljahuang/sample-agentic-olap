@@ -10,20 +10,20 @@ Quick 内置的 agent 自动调用 MCP 工具（`list_metrics` / `run_query`）�
 语义层查询、生成 SQL、在 Redshift 取数并给出分析——全程不写 SQL，口径由语义层
 统一保证。
 
-### 自然语言问数与分析
+### Amazon Quick 自然语言问数与分析
 
 ![Amazon Quick 通过 agentic-olap MCP 自然语言问数](docs/images/agent-conversation.png)
 
-![Amazon Quick + agentic-olap MCP 分析示例一](docs/images/amazon-quick-demo-1.png)
+![Amazon Quick 基于 agentic-olap MCP 数据的可视化仪表盘](docs/images/amazon-quick-dashboard.png)
 
-![Amazon Quick + agentic-olap MCP 分析示例二](docs/images/amazon-quick-demo-2.png)
-
-### Vue 前端门户
+### Vue 前端门户（连接指引 / 指标目录 / 查询实验台）
 
 服务自带的门户提供连接指引、指标目录和查询实验台：业务人员可以直接浏览可用指标与
 维度，在实验台里试跑查询、查看 MetricFlow 生成的 SQL 和返回数据。
 
-![Vue 前端门户：连接指引 / 指标目录 / 查询实验台](docs/images/portal.png)
+![Vue 前端门户：连接 MCP 指引与指标目录](docs/images/portal-catalog.png)
+
+![Vue 前端门户：查询实验台，试跑查询并查看生成的 SQL](docs/images/portal-query-lab.png)
 
 ## 第一次跑这个项目
 
