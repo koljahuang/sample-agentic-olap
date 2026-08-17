@@ -97,13 +97,21 @@ infra/terraform/
 ├── dbt_runner.tf       一次性 dbt 构建任务（在 VPC 内跑 dbt）
 ├── bootstrap/          远端 state 的一次性初始化
 └── environments/
-    ├── dev.tfvars            dev 的变量
+    ├── dev.tfvars.example    dev 变量模板（脱敏，入库）
+    ├── dev.tfvars            dev 的变量（含真实值，已被 .gitignore 忽略）
     ├── dev.s3.tfbackend      dev 的 state 位置
     ├── prod.tfvars           prod 的变量
     └── prod.s3.tfbackend     prod 的 state 位置
 ```
 
 ## 需要你填的值：什么时候改什么
+
+`dev.tfvars` 含真实值、已被 `.gitignore` 忽略，仓库里不存在。首次使用先从模板复制：
+
+```bash
+cd infra/terraform/environments
+cp dev.tfvars.example dev.tfvars   # 再填入你自己的真实值
+```
 
 代码里所有需要替换的地方都在下表。**其余文件不用改。**
 
