@@ -1,0 +1,30 @@
+# dev 环境变量模板。复制为 dev.tfvars 并填入你自己的真实值：
+#   cp dev.tfvars.example dev.tfvars
+# dev.tfvars 已被 .gitignore 忽略，不会提交到仓库。
+
+environment                    = "dev"
+region                         = "us-east-1"
+vpc_cidr                       = "10.21.0.0/16"
+az_count                       = 3
+redshift_base_rpu              = 32
+redshift_max_rpu               = 64
+redshift_usage_limit_rpu_hours = 300
+service_desired_count          = 1
+
+# 你的域名与证书（证书必须位于上面的 region，且覆盖 app_domain）
+app_domain          = "your-app.example.com"
+route53_zone_name   = "example.com"
+acm_certificate_arn = "arn:aws:acm:us-east-1:<ACCOUNT_ID>:certificate/<CERT_ID>"
+
+# 容器镜像（推送到你自己的 ECR 后填入）
+service_image    = "<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/medical-data-service:<TAG>"
+dbt_runner_image = "<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/medical-dbt-runner:<TAG>"
+
+# MCP 访问控制（Cognito 用户池与 client 需提前创建；见 docs/mcp-oauth.md）
+mcp_oauth_enabled        = true
+cognito_user_pool_id     = "<REGION>_<POOL_ID>"
+cognito_client_id        = "<COGNITO_APP_CLIENT_ID>"
+cognito_agent_client_id  = "<COGNITO_AGENT_CLIENT_ID>"
+cognito_domain           = "<PREFIX>.auth.us-east-1.amazoncognito.com"
+admin_email              = "you@example.com"
+mcp_api_keys_secret_name = "medical/dev/mcp-api-keys"
