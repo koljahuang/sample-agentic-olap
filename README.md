@@ -3,6 +3,28 @@
 端到端 POC：在 AWS Redshift Serverless 上落地医药销售数仓、MetricFlow 语义层，
 并把语义层暴露成一个**远程 MCP 服务**，让本地 AI agent 用自然语言问数和分析。
 
+## 案例展示（Amazon Quick + agentic-olap MCP）
+
+把 agentic-olap MCP 接入 Amazon Quick 后，业务人员在对话里直接用中文提问，Amazon
+Quick 内置的 agent 自动调用 MCP 工具（`list_metrics` / `run_query`），把问题翻译成
+语义层查询、生成 SQL、在 Redshift 取数并给出分析——全程不写 SQL，口径由语义层
+统一保证。
+
+### 自然语言问数与分析
+
+![Amazon Quick 通过 agentic-olap MCP 自然语言问数](docs/images/agent-conversation.png)
+
+![Amazon Quick + agentic-olap MCP 分析示例一](docs/images/amazon-quick-demo-1.png)
+
+![Amazon Quick + agentic-olap MCP 分析示例二](docs/images/amazon-quick-demo-2.png)
+
+### Vue 前端门户
+
+服务自带的门户提供连接指引、指标目录和查询实验台：业务人员可以直接浏览可用指标与
+维度，在实验台里试跑查询、查看 MetricFlow 生成的 SQL 和返回数据。
+
+![Vue 前端门户：连接指引 / 指标目录 / 查询实验台](docs/images/portal.png)
+
 ## 第一次跑这个项目
 
 看操作文档：**[GETTING-STARTED.md](GETTING-STARTED.md)**
@@ -235,29 +257,7 @@ POST /api/query            执行查询返回数据
 
 agent 会调用 `list_metrics` / `run_query` 等工具，生成 SQL、取数并给出分析。
 
-## 9. 案例展示（Amazon Quick + agentic-olap MCP）
-
-把 agentic-olap MCP 接入 Amazon Quick 后，业务人员在对话里直接用中文提问，Amazon
-Quick 内置的 agent 自动调用 MCP 工具（`list_metrics` / `run_query`），把问题翻译成
-语义层查询、生成 SQL、在 Redshift 取数并给出分析——全程不写 SQL，口径由语义层
-统一保证。
-
-### 自然语言问数与分析
-
-![Amazon Quick 通过 agentic-olap MCP 自然语言问数](docs/images/agent-conversation.png)
-
-![Amazon Quick + agentic-olap MCP 分析示例一](docs/images/amazon-quick-demo-1.png)
-
-![Amazon Quick + agentic-olap MCP 分析示例二](docs/images/amazon-quick-demo-2.png)
-
-### Vue 前端门户
-
-服务自带的门户提供连接指引、指标目录和查询实验台：业务人员可以直接浏览可用指标与
-维度，在实验台里试跑查询、查看 MetricFlow 生成的 SQL 和返回数据。
-
-![Vue 前端门户：连接指引 / 指标目录 / 查询实验台](docs/images/portal.png)
-
-## 10. 归因分析
+## 9. 归因分析
 
 营销归因采用 linear 模型，保证同一订单明细的归因权重之和为 1，可计算：
 
@@ -267,7 +267,7 @@ Quick 内置的 agent 自动调用 MCP 工具（`list_metrics` / `run_query`）�
 触点类型贡献
 ```
 
-## 11. POC 成本控制
+## 10. POC 成本控制
 
 ```text
 8 RPU 起步
@@ -276,7 +276,7 @@ Quick 内置的 agent 自动调用 MCP 工具（`list_metrics` / `run_query`）�
 数据规模控制在演示级别
 ```
 
-## 12. 当前验收结果
+## 11. 当前验收结果
 
 ```text
 Redshift Serverless 环境: 就绪
@@ -287,7 +287,7 @@ run_query: 生成 SQL 并在 Redshift 执行返回数据
 Vue 前端: 连接指引 / 指标目录 / 查询实验台可用
 ```
 
-## 13. 从本地到 AWS，再到真实生产
+## 12. 从本地到 AWS，再到真实生产
 
 三个阶段用的是**同一套业务代码**（dbt 模型、语义层、MCP 服务、前端），
 变的只是运行位置和资源规格。
@@ -315,6 +315,3 @@ ECS 副本          1                    -> 2+，并加 Auto Scaling
 可用区            2                    -> 3
 用量限制          300 RPU-hours        -> 按预算设
 ```
-
-真实生产若需要重新引入访问控制（本 POC 已移除），可在 MCP 层加 OAuth 并按组织
-架构做行级/列级策略——这不在当前 POC 范围内。
