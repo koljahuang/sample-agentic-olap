@@ -235,15 +235,20 @@ POST /api/query            执行查询返回数据
 
 agent 会调用 `list_metrics` / `run_query` 等工具，生成 SQL、取数并给出分析。
 
-## 9. 案例展示
+## 9. 案例展示（Amazon Quick + agentic-olap MCP）
 
-### 本地 AI agent 自然语言问数
+把 agentic-olap MCP 接入 Amazon Quick 后，业务人员在对话里直接用中文提问，Amazon
+Quick 内置的 agent 自动调用 MCP 工具（`list_metrics` / `run_query`），把问题翻译成
+语义层查询、生成 SQL、在 Redshift 取数并给出分析——全程不写 SQL，口径由语义层
+统一保证。
 
-在 Amazon Q / Claude 里直接用中文提问，agent 自动调用 MCP 工具（`list_metrics` /
-`run_query`），把问题翻译成语义层查询、生成 SQL、在 Redshift 取数，并给出分析结论——
-全程不用手写 SQL，口径由语义层统一保证。
+### 自然语言问数与分析
 
-![本地 AI agent 通过 MCP 自然语言问数与分析](docs/images/agent-conversation.png)
+![Amazon Quick 通过 agentic-olap MCP 自然语言问数](docs/images/agent-conversation.png)
+
+![Amazon Quick + agentic-olap MCP 分析示例一](docs/images/amazon-quick-demo-1.png)
+
+![Amazon Quick + agentic-olap MCP 分析示例二](docs/images/amazon-quick-demo-2.png)
 
 ### Vue 前端门户
 
