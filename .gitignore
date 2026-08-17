@@ -13,6 +13,10 @@ medical-olap-dbt/logs/
 node_modules/
 dist/
 
+# Local package/build caches (redirected here to avoid sandbox-restricted global caches)
+**/.npmcache/
+**/.uvcache/
+
 # Terraform
 .terraform/
 .terraform.lock.hcl

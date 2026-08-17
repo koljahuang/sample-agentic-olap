@@ -10,6 +10,47 @@ Quick 内置的 agent 自动调用 MCP 工具（`list_metrics` / `run_query`）�
 语义层查询、生成 SQL、在 Redshift 取数并给出分析——全程不写 SQL，口径由语义层
 统一保证。
 
+### 一次真实问数：三个名字 → 一段 SQL → 可信的数
+
+业务提问：
+
+> 按大区看今年的净销售额和订单数，哪个区最高？
+
+agent 并不书写 SQL，它只从语义层清单里选中三个名字：`net_sales_amount`、
+`order_count`、`sales_region__sales_region_name`。MetricFlow 把这三个名字编译成
+**唯一确定**的 Redshift SQL——注意 `COMPLETED` 过滤和 `dim_sales_region` 的 JOIN
+都是语义层自动补的，提问里一个字都没提：
+
+```sql
+SELECT
+  sales_region_name        AS sales_region__sales_region_name,
+  SUM(net_amount)          AS net_sales_amount,
+  COUNT(DISTINCT order_id) AS order_count
+FROM "dwd"."fct_sales_order_item" fct
+LEFT JOIN "dwd"."dim_sales_region" reg
+  ON fct.sales_region_id = reg.sales_region_id
+WHERE order_status = 'COMPLETED'
+GROUP BY sales_region_name
+```
+
+真实返回（与财务口径一致）：
+
+```text
+大区     净销售额        订单数
+华东     ￥9,774 万      1,062
+华南     ￥8,550 万        934
+华北     ￥5,093 万        570
+西部     ￥4,510 万        466
+```
+
+**更关键的是它会诚实地说“做不到”**：问“各治疗领域的毛利率”——库里没有成本数据，
+它直接回答无法计算，而不是编一个假数；问“按治疗领域看营销成本”——营销成本与治疗
+领域之间没有 JOIN 路径，它干脆拒绝，而不是硬拼出一个没有业务含义的数。能力边界
+被明确画出，边界之内的每一个数才敢原样呈到决策桌上。
+
+> 这套设计背后“为什么不能让 AI 直接写 SQL、语义层如何把口径钉成一份契约”的完整
+> 拆解，见随附文章 [`wechat-article.md`](wechat-article.md) 与教程 part-01。
+
 ### Amazon Quick 自然语言问数与分析
 
 ![Amazon Quick 通过 agentic-olap MCP 自然语言问数](docs/images/agent-conversation.png)
@@ -80,6 +121,55 @@ Redshift Serverless 上落地医药销售数仓、语义层，并让 AI agent �
 ```
 
 ## 3. 整体架构
+
+![agentic-olap 整体架构：数仓 → 语义层 → MCP → AI](docs/images/architecture.png)
+
+<details>
+<summary>架构图源码（Mermaid，可在 GitHub 直接渲染）</summary>
+
+```mermaid
+flowchart TB
+    U(["业务用户 / 分析师"])
+
+    subgraph AGENT["本地 AI Agent · Amazon Q / Claude"]
+        LLM["大模型<br/>把人话翻译成合法的指标/维度名"]
+    end
+
+    subgraph SVC["数据服务 medical-data-service · ECS Fargate + ALB · 单域名 HTTPS"]
+        MCP["远程 MCP Server /mcp（Streamable HTTP）<br/>list_metrics · list_dimensions · preview_sql · run_query"]
+        VUE["Vue 前端门户<br/>连接指引 · 指标目录 · 查询实验台"]
+    end
+
+    SEM["MetricFlow 语义层<br/>15 指标 / 35 维度（统一口径合同）"]
+
+    subgraph DW["数据仓库 medical-olap-dbt · dbt on Redshift Serverless"]
+        SEED["业务模拟数据 seed"]
+        DWD["DWD 明细层<br/>fct_sales_order_item 等原子事实<br/>★ 指标只定义在这一层"]
+        DWS["DWS 汇总层<br/>销售日汇总 · 营销归因(linear)"]
+        ADS["ADS 跨域宽表<br/>仅供 BI 明细下钻"]
+        SEED --> DWD --> DWS --> ADS
+    end
+
+    RS[["Redshift Serverless<br/>Data API 执行 SQL"]]
+
+    U -- 自然语言提问 --> LLM
+    U -. 浏览器 .-> VUE
+    LLM <-->|MCP over HTTP| MCP
+    MCP --> SEM
+    VUE --> SEM
+    DWD -. 指标口径来自原子层 .-> SEM
+    SEM -- 编译出确定性 SQL --> RS
+    RS -- 列 + 行 --> MCP
+```
+
+```
+
+</details>
+
+> 关键分界：**「自然语言 → 三个名字」只发生在最上方的大模型里**；从 MCP 往下，
+> 语义层把名字编译成唯一确定的 SQL，交给 Redshift 执行——口径不再由 AI 决定。
+
+文字版：
 
 ```text
 业务模拟数据 (dbt seed)
