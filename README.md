@@ -235,7 +235,24 @@ POST /api/query            执行查询返回数据
 
 agent 会调用 `list_metrics` / `run_query` 等工具，生成 SQL、取数并给出分析。
 
-## 9. 归因分析
+## 9. 案例展示
+
+### 本地 AI agent 自然语言问数
+
+在 Amazon Q / Claude 里直接用中文提问，agent 自动调用 MCP 工具（`list_metrics` /
+`run_query`），把问题翻译成语义层查询、生成 SQL、在 Redshift 取数，并给出分析结论——
+全程不用手写 SQL，口径由语义层统一保证。
+
+![本地 AI agent 通过 MCP 自然语言问数与分析](docs/images/agent-conversation.png)
+
+### Vue 前端门户
+
+服务自带的门户提供连接指引、指标目录和查询实验台：业务人员可以直接浏览可用指标与
+维度，在实验台里试跑查询、查看 MetricFlow 生成的 SQL 和返回数据。
+
+![Vue 前端门户：连接指引 / 指标目录 / 查询实验台](docs/images/portal.png)
+
+## 10. 归因分析
 
 营销归因采用 linear 模型，保证同一订单明细的归因权重之和为 1，可计算：
 
@@ -245,7 +262,7 @@ agent 会调用 `list_metrics` / `run_query` 等工具，生成 SQL、取数并�
 触点类型贡献
 ```
 
-## 10. POC 成本控制
+## 11. POC 成本控制
 
 ```text
 8 RPU 起步
@@ -254,7 +271,7 @@ agent 会调用 `list_metrics` / `run_query` 等工具，生成 SQL、取数并�
 数据规模控制在演示级别
 ```
 
-## 11. 当前验收结果
+## 12. 当前验收结果
 
 ```text
 Redshift Serverless 环境: 就绪
@@ -265,7 +282,7 @@ run_query: 生成 SQL 并在 Redshift 执行返回数据
 Vue 前端: 连接指引 / 指标目录 / 查询实验台可用
 ```
 
-## 12. 从本地到 AWS，再到真实生产
+## 13. 从本地到 AWS，再到真实生产
 
 三个阶段用的是**同一套业务代码**（dbt 模型、语义层、MCP 服务、前端），
 变的只是运行位置和资源规格。
@@ -296,14 +313,3 @@ ECS 副本          1                    -> 2+，并加 Auto Scaling
 
 真实生产若需要重新引入访问控制（本 POC 已移除），可在 MCP 层加 OAuth 并按组织
 架构做行级/列级策略——这不在当前 POC 范围内。
-
-## 13. 核心价值总结
-
-```text
-统一数仓分层, 跨域可分析
-MetricFlow 统一指标口径
-语义层封装为远程 MCP 服务
-本地 AI agent 自然语言问数与分析
-营销归因量化 ROI
-最小资源即可验证完整闭环
-```
