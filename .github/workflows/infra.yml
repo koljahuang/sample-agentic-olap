@@ -1,0 +1,58 @@
+name: infra
+
+on:
+  push:
+    paths: ["infra/terraform/**", ".github/workflows/infra.yml"]
+  pull_request:
+    paths: ["infra/terraform/**"]
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.TF_PLAN_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - run: terraform fmt -check
+      # The backend is a partial configuration, so init needs the environment's
+      # state location. Without it Terraform prompts and the job hangs.
+      - run: terraform init -backend-config=environments/prod.s3.tfbackend
+      - run: terraform validate
+      - name: Terraform plan (prod)
+        run: terraform plan -var-file=environments/prod.tfvars -out=tfplan
+
+  # Apply is a separate, manually approved job in production.
+  apply:
+    needs: plan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.TF_APPLY_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: terraform init -backend-config=environments/prod.s3.tfbackend
+      - run: terraform apply -var-file=environments/prod.tfvars -auto-approve

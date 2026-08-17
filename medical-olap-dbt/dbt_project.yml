@@ -1,0 +1,36 @@
+name: medical_olap
+version: 1.0.0
+config-version: 2
+
+profile: medical_olap
+
+model-paths: [models]
+seed-paths: [seeds]
+test-paths: [tests]
+macro-paths: [macros]
+
+vars:
+  # Marketing attribution lookback window, in days.
+  #
+  # Without a window, an order matches every touchpoint the customer ever had:
+  # a 2026 order would credit a 2024 email, which is not a claim the business
+  # can defend. Industry practice is 30 to 90 days. Set to 0 to disable the
+  # window and match all prior touchpoints.
+  attribution_lookback_days: 90
+
+models:
+  medical_olap:
+    dwd:
+      +schema: dwd
+      +materialized: table
+    dws:
+      +schema: dws
+      +materialized: table
+    ads:
+      +schema: ads
+      +materialized: table
+
+seeds:
+  medical_olap:
+    +schema: sim_business
+    +quote_columns: false

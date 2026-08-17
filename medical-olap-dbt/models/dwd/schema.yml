@@ -1,0 +1,451 @@
+version: 2
+
+# ---------------------------------------------------------------------------
+# The semantic layer lives here, on atomic facts (DWD) and conformed
+# dimensions (DIM). Metrics are defined exactly once, at the finest grain
+# available, so non-additive metrics such as count_distinct and ratio stay
+# correct. DWS and ADS are downstream caches, not definition sources.
+# ---------------------------------------------------------------------------
+
+models:
+
+  # =========================================================================
+  # Conformed dimensions
+  # =========================================================================
+
+  - name: dim_customer
+    description: Customer dimension. One row per customer (hospital, pharmacy or clinic).
+    semantic_model:
+      enabled: true
+      name: customers
+    columns:
+      - name: customer_id
+        entity:
+          type: primary
+          name: customer
+        tests: [not_null, unique]
+      - name: customer_name
+        description: Customer legal name. Sensitive; masked for most roles.
+        dimension:
+          type: categorical
+          name: customer_name
+      - name: customer_type
+        description: 医院 / 药店 / 诊所.
+        dimension:
+          type: categorical
+          name: customer_type
+      - name: hospital_level
+        description: Hospital grade (三甲/三乙/二甲/一级). Empty for pharmacies.
+        dimension:
+          type: categorical
+          name: hospital_level
+      - name: province_code
+        dimension:
+          type: categorical
+          name: province_code
+      - name: city_code
+        dimension:
+          type: categorical
+          name: city_code
+      - name: customer_segment
+        description: Commercial value tier A/B/C.
+        dimension:
+          type: categorical
+          name: customer_segment
+
+  - name: dim_product
+    description: Product dimension. One row per marketed product.
+    semantic_model:
+      enabled: true
+      name: products
+    columns:
+      - name: product_id
+        entity:
+          type: primary
+          name: product
+        tests: [not_null, unique]
+      - name: product_name
+        dimension:
+          type: categorical
+          name: product_name
+      - name: generic_name
+        dimension:
+          type: categorical
+          name: generic_name
+      - name: therapy_area
+        description: Therapeutic area, the way the business splits its portfolio.
+        dimension:
+          type: categorical
+          name: therapy_area
+      - name: product_category
+        description: 处方药 or OTC.
+        dimension:
+          type: categorical
+          name: product_category
+
+  - name: dim_sales_rep
+    description: Sales representative dimension.
+    semantic_model:
+      enabled: true
+      name: sales_reps
+    columns:
+      - name: sales_rep_id
+        entity:
+          type: primary
+          name: sales_rep
+        tests: [not_null, unique]
+      - name: sales_rep_name
+        dimension:
+          type: categorical
+          name: sales_rep_name
+
+  - name: dim_sales_region
+    description: Conformed sales region dimension.
+    semantic_model:
+      enabled: true
+      name: sales_regions
+    columns:
+      - name: sales_region_id
+        entity:
+          type: primary
+          name: sales_region
+        tests: [not_null, unique]
+      - name: sales_region_name
+        dimension:
+          type: categorical
+          name: sales_region_name
+
+  - name: dim_channel
+    description: Conformed sales channel dimension.
+    semantic_model:
+      enabled: true
+      name: channels
+    columns:
+      - name: channel_id
+        entity:
+          type: primary
+          name: channel
+        tests: [not_null, unique]
+      - name: channel_name
+        dimension:
+          type: categorical
+          name: channel_name
+
+  # =========================================================================
+  # Atomic facts
+  # =========================================================================
+
+  - name: fct_sales_order
+    description: Order header fact. One row per order. No semantic model; order
+      level attributes are denormalized onto fct_sales_order_item so the sales
+      semantic model reaches every dimension in a single join.
+    columns:
+      - name: order_id
+        tests: [not_null, unique]
+
+  - name: fct_sales_order_item
+    description: Atomic sales fact at order-item grain. Owns every sales metric.
+    semantic_model:
+      enabled: true
+      name: sales_order_items
+    primary_entity: order_item
+    agg_time_dimension: order_date
+    columns:
+      - name: order_item_id
+        tests: [not_null, unique]
+      - name: order_date
+        granularity: day
+        dimension:
+          type: time
+          name: order_date
+        tests: [not_null]
+      - name: order_status
+        description: COMPLETED or CANCELLED. Sales metrics filter on COMPLETED.
+        dimension:
+          type: categorical
+          name: order_status
+      - name: customer_id
+        entity:
+          type: foreign
+          name: customer
+        tests: [not_null]
+      - name: product_id
+        entity:
+          type: foreign
+          name: product
+        tests: [not_null]
+      - name: sales_rep_id
+        entity:
+          type: foreign
+          name: sales_rep
+      - name: channel_id
+        entity:
+          type: foreign
+          name: channel
+      - name: sales_region_id
+        entity:
+          type: foreign
+          name: sales_region
+      - name: quantity
+      - name: unit_price
+      - name: discount_amount
+      - name: net_amount
+    metrics:
+      - name: net_sales_amount
+        description: Net sales amount after discounts, completed orders only.
+        type: simple
+        label: 药品净销售额
+        agg: sum
+        expr: net_amount
+        filter: "{{ Dimension('order_item__order_status') }} = 'COMPLETED'"
+
+      - name: quantity
+        description: Units sold, completed orders only.
+        type: simple
+        label: 销售数量
+        agg: sum
+        expr: quantity
+        filter: "{{ Dimension('order_item__order_status') }} = 'COMPLETED'"
+
+      - name: order_count
+        description: Distinct completed orders. count_distinct because one order
+          spans several order items.
+        type: simple
+        label: 订单数
+        agg: count_distinct
+        expr: order_id
+        filter: "{{ Dimension('order_item__order_status') }} = 'COMPLETED'"
+
+      - name: order_item_count
+        description: Completed order lines.
+        type: simple
+        label: 订单明细数
+        agg: count
+        expr: order_item_id
+        filter: "{{ Dimension('order_item__order_status') }} = 'COMPLETED'"
+
+      - name: active_customer_count
+        description: Distinct customers that purchased.
+        type: simple
+        label: 活跃客户数
+        agg: count_distinct
+        expr: customer_id
+        filter: "{{ Dimension('order_item__order_status') }} = 'COMPLETED'"
+
+  - name: fct_payment
+    description: Payment fact at payment grain. Owns the payment metric, so the
+      order level amount is never multiplied by the number of order items.
+    semantic_model:
+      enabled: true
+      name: payments
+    primary_entity: payment
+    agg_time_dimension: payment_date
+    columns:
+      - name: payment_id
+        tests: [not_null, unique]
+      - name: payment_date
+        granularity: day
+        dimension:
+          type: time
+          name: payment_date
+        tests: [not_null]
+      - name: payment_status
+        description: PAID or PARTIAL.
+        dimension:
+          type: categorical
+          name: payment_status
+      - name: order_status
+        dimension:
+          type: categorical
+          name: order_status
+      - name: customer_id
+        entity:
+          type: foreign
+          name: customer
+      - name: sales_rep_id
+        entity:
+          type: foreign
+          name: sales_rep
+      - name: channel_id
+        entity:
+          type: foreign
+          name: channel
+      - name: sales_region_id
+        entity:
+          type: foreign
+          name: sales_region
+      - name: payment_amount
+    metrics:
+      - name: payment_amount
+        description: Cash collected on completed orders.
+        type: simple
+        label: 回款金额
+        agg: sum
+        expr: payment_amount
+        filter: "{{ Dimension('payment__order_status') }} = 'COMPLETED'"
+
+  - name: fct_campaign_touchpoint
+    description: Marketing touchpoint fact. Owns campaign cost at its native
+      grain, so cost is never inflated by the attribution bridge.
+    semantic_model:
+      enabled: true
+      name: touchpoints
+    primary_entity: touchpoint
+    agg_time_dimension: touchpoint_time
+    columns:
+      - name: touchpoint_id
+        tests: [not_null, unique]
+      - name: touchpoint_time
+        granularity: day
+        dimension:
+          type: time
+          name: touchpoint_time
+        tests: [not_null]
+      - name: touchpoint_type
+        description: HOSPITAL_VISIT / CONFERENCE / EMAIL / ONLINE.
+        dimension:
+          type: categorical
+          name: touchpoint_type
+      - name: campaign_id
+        dimension:
+          type: categorical
+          name: campaign_id
+      - name: customer_id
+        entity:
+          type: foreign
+          name: customer
+      - name: sales_rep_id
+        entity:
+          type: foreign
+          name: sales_rep
+      - name: sales_region_id
+        entity:
+          type: foreign
+          name: sales_region
+      - name: cost_amount
+    metrics:
+      - name: campaign_cost
+        description: Marketing spend, counted once per touchpoint.
+        type: simple
+        label: 推广成本
+        agg: sum
+        expr: cost_amount
+
+      - name: touchpoint_count
+        description: Number of marketing touchpoints.
+        type: simple
+        label: 推广接触次数
+        agg: count
+        expr: touchpoint_id
+
+  - name: fct_prescription
+    description: Prescription event fact. Leading indicator of real demand.
+    semantic_model:
+      enabled: true
+      name: prescriptions
+    primary_entity: prescription_event
+    agg_time_dimension: event_date
+    columns:
+      - name: prescription_event_id
+        tests: [not_null, unique]
+      - name: event_date
+        granularity: day
+        dimension:
+          type: time
+          name: event_date
+        tests: [not_null]
+      - name: customer_id
+        entity:
+          type: foreign
+          name: customer
+      - name: product_id
+        entity:
+          type: foreign
+          name: product
+      - name: sales_region_id
+        entity:
+          type: foreign
+          name: sales_region
+      - name: prescription_count
+      - name: patient_count
+    metrics:
+      - name: prescription_count
+        description: Prescriptions written.
+        type: simple
+        label: 处方量
+        agg: sum
+        expr: prescription_count
+
+      - name: patient_count
+        description: Patients covered.
+        type: simple
+        label: 覆盖病人数
+        agg: sum
+        expr: patient_count
+
+  - name: fct_campaign_attribution
+    description: Attribution bridge at (order item x touchpoint) grain. Exposes
+      only pre-allocated measures. Campaign cost is deliberately not a metric
+      here; it belongs to fct_campaign_touchpoint.
+    semantic_model:
+      enabled: true
+      name: campaign_attribution
+    primary_entity: campaign_attribution
+    agg_time_dimension: order_date
+    columns:
+      - name: order_item_id
+        entity:
+          type: foreign
+          name: order_item
+        tests: [not_null]
+      - name: touchpoint_id
+        entity:
+          type: foreign
+          name: touchpoint
+        tests: [not_null]
+      - name: order_date
+        granularity: day
+        dimension:
+          type: time
+          name: order_date
+        tests: [not_null]
+      - name: attribution_model
+        description: Attribution rule applied. Currently linear only.
+        dimension:
+          type: categorical
+          name: attribution_model
+        tests: [not_null]
+      - name: touchpoint_type
+        dimension:
+          type: categorical
+          name: touchpoint_type
+      - name: customer_id
+        entity:
+          type: foreign
+          name: customer
+      - name: product_id
+        entity:
+          type: foreign
+          name: product
+      - name: sales_region_id
+        entity:
+          type: foreign
+          name: sales_region
+      - name: attribution_weight
+        tests: [not_null]
+      - name: attributed_revenue
+    metrics:
+      - name: attributed_revenue
+        description: Revenue allocated to a marketing touchpoint. Sums back to
+          net sales for order items that matched at least one touchpoint.
+        type: simple
+        label: 营销归因收入
+        agg: sum
+        expr: attributed_revenue
+
+      - name: attribution_weight
+        description: Allocation weight. Sums to 1 per order item.
+        type: simple
+        label: 归因权重
+        agg: sum
+        expr: attribution_weight

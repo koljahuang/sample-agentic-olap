@@ -1,0 +1,18 @@
+0 verbose cli /opt/homebrew/Cellar/node/26.0.0/bin/node /opt/homebrew/bin/npm
+1 info using npm@11.12.1
+2 info using node@v26.0.0
+3 silly config load:file:/opt/homebrew/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/kolya/kolya-projects/sample-agentic-olap/medical-data-service/frontend/.npmrc
+5 silly config load:file:/Users/kolya/.npmrc
+6 silly config load:file:/opt/homebrew/etc/npmrc
+7 verbose title npm run build
+8 verbose argv "run" "build"
+9 verbose logfile logs-max:10 dir:/Users/kolya/kolya-projects/sample-agentic-olap/medical-data-service/frontend/.npmcache/_logs/2026-08-16T10_37_24_728Z-
+10 verbose logfile /Users/kolya/kolya-projects/sample-agentic-olap/medical-data-service/frontend/.npmcache/_logs/2026-08-16T10_37_24_728Z-debug-0.log
+11 silly logfile done cleaning log files
+12 verbose cwd /Users/kolya/kolya-projects/sample-agentic-olap/medical-data-service/frontend
+13 verbose os Darwin 25.5.0
+14 verbose node v26.0.0
+15 verbose npm  v11.12.1
+16 verbose exit 0
+17 info ok

@@ -1,0 +1,104 @@
+version: 2
+
+# Common business questions, registered once. These are the definition source
+# for the derived caches in the dws schema: the cache is generated from the
+# semantic layer, so an accelerated table and an ad-hoc query can never disagree
+# about what "net sales" means.
+#
+# dbt's own `export` runner is a dbt platform feature. On dbt-core, materialize
+# these with:
+#
+#     python scripts/materialize_saved_queries.py --list
+#     python scripts/materialize_saved_queries.py --dry-run
+#
+# The export blocks below stay declarative so the same definitions work
+# unchanged if this project ever moves onto the dbt platform.
+
+saved_queries:
+  - name: sales_daily_by_region
+    description: Daily net sales, order count and units by sales region.
+    label: 每日区域销售
+    query_params:
+      metrics:
+        - net_sales_amount
+        - order_count
+        - quantity
+      group_by:
+        - "TimeDimension('metric_time', 'day')"
+        - "Dimension('sales_region__sales_region_name')"
+    exports:
+      - name: sales_daily_by_region
+        config:
+          export_as: table
+          schema: dws
+
+  - name: sales_monthly_by_therapy_area
+    description: Monthly net sales and active customers per therapy area, the
+      view the therapeutic business units are measured on.
+    label: 每月治疗领域销售
+    query_params:
+      metrics:
+        - net_sales_amount
+        - active_customer_count
+        - order_count
+      group_by:
+        - "TimeDimension('metric_time', 'month')"
+        - "Dimension('product__therapy_area')"
+    exports:
+      - name: sales_monthly_by_therapy_area
+        config:
+          export_as: table
+          schema: dws
+
+  - name: payment_rate_monthly_by_region
+    description: Monthly cash collection rate by region. Numerator and
+      denominator are read at their own grain, so the rate cannot exceed 100%.
+    label: 每月区域回款率
+    query_params:
+      metrics:
+        - net_sales_amount
+        - payment_amount
+        - payment_rate
+      group_by:
+        - "TimeDimension('metric_time', 'month')"
+        - "Dimension('sales_region__sales_region_name')"
+    exports:
+      - name: payment_rate_monthly_by_region
+        config:
+          export_as: table
+          schema: dws
+
+  - name: campaign_roi_monthly
+    description: Monthly attributed revenue against campaign spend. Spend comes
+      from the touchpoint fact, so the attribution bridge cannot inflate it.
+    label: 每月营销 ROI
+    query_params:
+      metrics:
+        - attributed_revenue
+        - campaign_cost
+        - roi
+      group_by:
+        - "TimeDimension('metric_time', 'month')"
+    exports:
+      - name: campaign_roi_monthly
+        config:
+          export_as: table
+          schema: dws
+
+  - name: channel_mix_monthly
+    description: Monthly sales split by channel and customer type.
+    label: 每月渠道结构
+    query_params:
+      metrics:
+        - net_sales_amount
+        - order_count
+        - average_order_value
+      group_by:
+        - "TimeDimension('metric_time', 'month')"
+        - "Dimension('channel__channel_name')"
+        - "Dimension('customer__customer_type')"
+    exports:
+      - name: channel_mix_monthly
+        config:
+          export_as: table
+          schema: dws

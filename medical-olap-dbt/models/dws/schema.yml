@@ -1,0 +1,36 @@
+version: 2
+
+# ---------------------------------------------------------------------------
+# DWS holds derived caches only. There is deliberately no semantic model here.
+#
+# Metrics are defined once on the atomic facts in models/dwd/. Defining them
+# again on a pre-aggregated table would create a second source of truth, and
+# non-additive metrics (count_distinct, ratio) cannot be rebuilt from a
+# pre-aggregate at all.
+#
+# Every column below is additive, so these tables stay safe to sum over any
+# subset of their grain.
+# ---------------------------------------------------------------------------
+
+models:
+  - name: sales_daily_summary
+    description: >-
+      Derived cache. Additive sales measures by day, region, customer, product,
+      rep and channel. Order counts and payment amounts are deliberately absent
+      because they are not safely re-aggregatable at this grain. Query those
+      through the semantic layer instead.
+    columns:
+      - name: stat_date
+        tests: [not_null]
+      - name: quantity
+      - name: net_sales_amount
+
+  - name: customer_monthly_summary
+    description: >-
+      Derived cache. Monthly customer activity. order_count is safe here because
+      an order belongs to exactly one customer and one month.
+    columns:
+      - name: stat_month
+        tests: [not_null]
+      - name: customer_id
+        tests: [not_null]

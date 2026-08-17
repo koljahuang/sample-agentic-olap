@@ -1,0 +1,49 @@
+name: dbt
+
+on:
+  push:
+    paths: ["medical-olap-dbt/**", ".github/workflows/dbt.yml"]
+  pull_request:
+    paths: ["medical-olap-dbt/**"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: medical-olap-dbt
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: |
+          uv venv --python 3.13 .venv
+          uv pip install --python .venv/bin/python -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DBT_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Resolve Redshift credentials
+        run: |
+          SECRET=$(aws secretsmanager get-secret-value --secret-id "$REDSHIFT_SECRET_ARN" --query SecretString --output text)
+          echo "REDSHIFT_USER=$(echo "$SECRET" | python -c 'import json,sys;print(json.load(sys.stdin)["username"])')" >> "$GITHUB_ENV"
+          echo "::add-mask::$(echo "$SECRET" | python -c 'import json,sys;print(json.load(sys.stdin)["password"])')"
+          echo "REDSHIFT_PASSWORD=$(echo "$SECRET" | python -c 'import json,sys;print(json.load(sys.stdin)["password"])')" >> "$GITHUB_ENV"
+        env:
+          REDSHIFT_SECRET_ARN: ${{ secrets.REDSHIFT_SECRET_ARN }}
+
+      - name: dbt build (quality gate)
+        run: |
+          cp profiles.yml.example ~/.dbt/profiles.yml || (mkdir -p ~/.dbt && cp profiles.yml.example ~/.dbt/profiles.yml)
+          .venv/bin/dbt deps || true
+          .venv/bin/dbt seed
+          .venv/bin/dbt run
+          .venv/bin/dbt test

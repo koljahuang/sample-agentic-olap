@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: ads_sales_attribution_wide
+    description: "Cross-domain sales, marketing, payment and customer wide table. Grain: order item plus touchpoint."
+    columns:
+      - name: order_item_id
+        tests: [not_null]
+      - name: customer_id
+        tests: [not_null]
+      - name: product_id
+        tests: [not_null]
+      - name: attribution_model
+        tests: [not_null]

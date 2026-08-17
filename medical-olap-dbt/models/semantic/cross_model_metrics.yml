@@ -1,0 +1,31 @@
+version: 2
+
+# Metrics whose inputs live in different semantic models are declared at the top
+# level. MetricFlow aggregates numerator and denominator separately in their own
+# sub-queries, then joins on the shared dimensions. That is what keeps a ratio
+# correct: it is never itself additive.
+
+metrics:
+  - name: payment_rate
+    description: Cash collected divided by net sales. Numerator comes from the
+      payment fact, denominator from the sales fact, each at its own grain.
+    label: 回款率
+    type: ratio
+    numerator: payment_amount
+    denominator: net_sales_amount
+
+  - name: roi
+    description: Attributed revenue divided by campaign cost. The denominator is
+      read from the touchpoint fact, so it is not inflated by the attribution
+      bridge fan-out.
+    label: 营销 ROI
+    type: ratio
+    numerator: attributed_revenue
+    denominator: campaign_cost
+
+  - name: average_order_value
+    description: Net sales divided by distinct completed orders.
+    label: 平均订单金额
+    type: ratio
+    numerator: net_sales_amount
+    denominator: order_count

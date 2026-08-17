@@ -1,0 +1,74 @@
+name: data-service
+
+on:
+  push:
+    paths: ["medical-data-service/**", ".github/workflows/data-service.yml"]
+  pull_request:
+    paths: ["medical-data-service/**"]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: medical-data-service/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Run tests
+        run: uv run --extra dev pytest -q
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: medical-data-service/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci || npm install
+      - run: npm run build
+
+  deploy:
+    needs: [backend-test, frontend-build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # The UI and the API ship in one image and answer on one hostname, so the
+      # frontend build happens inside the Dockerfile. Build context is the
+      # medical-data-service directory because the image needs both trees.
+      - name: Build and push image
+        working-directory: medical-data-service
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/medical-data-service:${GITHUB_SHA::12}"
+          docker build -f backend/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy ECS service
+        run: |
+          aws ecs update-service \
+            --cluster medical-prod-cluster \
+            --service medical-prod-service \
+            --force-new-deployment
+
+          aws ecs wait services-stable \
+            --cluster medical-prod-cluster \
+            --services medical-prod-service

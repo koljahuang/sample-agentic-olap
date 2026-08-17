@@ -1,0 +1,5 @@
+# dbt 1.12+ model-level semantic configuration is required.
+dbt-core>=1.12,<2.0
+dbt-redshift>=1.11,<2.0
+# MetricFlow development branch requested for this POC.
+git+https://github.com/dbt-labs/metricflow.git@main
