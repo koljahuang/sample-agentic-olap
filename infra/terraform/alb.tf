@@ -9,6 +9,12 @@ resource "aws_lb" "service" {
   subnets            = aws_subnet.public[*].id
 
   drop_invalid_header_fields = true
+
+  # MCP uses Streamable HTTP with json_response=true: no bytes flow to the
+  # client until the Redshift query finishes. The default 60s idle timeout
+  # would sever a slow (cold-compile) query mid-flight, so keep it >= the
+  # app-side REDSHIFT_QUERY_TIMEOUT.
+  idle_timeout = var.alb_idle_timeout
 }
 
 resource "aws_lb_target_group" "service" {

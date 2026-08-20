@@ -23,6 +23,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from app.identity import current_caller
 from app.mcp_auth import CognitoTokenVerifier, caller_from_access_token
+from app.redshift.client import RedshiftTimeout
 from app.service import data_service, execution_enabled
 
 logger = logging.getLogger("mcp.caller")
@@ -129,6 +130,27 @@ def run_query(metrics: list[str], group_by: list[str] | None = None, limit: int 
                 **data_service().generate_sql(metrics, group_by or [], limit),
             }
         return {"caller": who, **data_service().run_query(metrics, group_by or [], limit)}
+    except RedshiftTimeout as exc:
+        # Graceful degradation for the most common failure: Redshift Serverless
+        # cold-start / first-time query compilation blowing past our timeout.
+        # Return a definitive, self-explanatory result (with the SQL) so the
+        # agent tells the user *why* and suggests a retry, instead of looping
+        # or hanging.
+        logger.info("run_query timeout by=%s stmt=%s elapsed=%.0fs",
+                    who, exc.statement_id, exc.elapsed)
+        hint = (
+            "查询超时并非因为数据量，而是 Redshift Serverless 的冷启动 / 首次查询编译"
+            "（同样的查询在计划被缓存后通常几秒即可返回）。请稍等片刻后重试；若经常发生，"
+            "可调大 REDSHIFT_QUERY_TIMEOUT 或对工作组做保活预热。"
+        )
+        result: dict[str, Any] = {"caller": who, "error": str(exc), "reason": "redshift_cold_start_timeout",
+                                  "retryable": True, "hint": hint,
+                                  "metrics": metrics, "group_by": group_by or []}
+        try:  # include the SQL for transparency; generating it is cheap and offline
+            result.update(data_service().generate_sql(metrics, group_by or [], limit))
+        except Exception:  # noqa: BLE001
+            pass
+        return result
     except Exception as exc:  # noqa: BLE001
         # Return a clean, final error instead of raising, so the agent gets a
         # definitive "not possible" and does not loop retrying variations.
@@ -141,7 +163,7 @@ def run_query(metrics: list[str], group_by: list[str] | None = None, limit: int 
                 "分组。换一个两者都支持的维度，或改用其他指标。"
             )
         logger.info("run_query failed by=%s error=%s", who, msg[:200])
-        return {"caller": who, "error": msg[:500], "hint": hint,
+        return {"caller": who, "error": msg[:500], "hint": hint, "retryable": False,
                 "metrics": metrics, "group_by": group_by or []}
 
 

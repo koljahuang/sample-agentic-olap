@@ -33,6 +33,10 @@ resource "aws_ecs_task_definition" "service" {
         { name = "REDSHIFT_HOST", value = aws_redshiftserverless_workgroup.main.endpoint[0].address },
         { name = "REDSHIFT_SECRET_ARN", value = aws_redshiftserverless_namespace.main.admin_password_secret_arn },
         { name = "QUERY_EXECUTION_ENABLED", value = "true" },
+        # Redshift Serverless cold-start / first-time query compilation can take
+        # minutes; keep this above that so the first run of a new query shape
+        # is not cancelled prematurely. Must be <= ALB idle timeout.
+        { name = "REDSHIFT_QUERY_TIMEOUT", value = tostring(var.redshift_query_timeout) },
         # Portal login (Cognito) + MCP OAuth. The pool/clients are created
         # out-of-band and passed in as ids.
         { name = "MCP_OAUTH_ENABLED", value = tostring(var.mcp_oauth_enabled) },

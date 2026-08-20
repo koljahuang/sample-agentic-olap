@@ -148,3 +148,15 @@ variable "mcp_api_keys_secret_name" {
   description = "Secrets Manager secret name holding the MCP API keys (API-key mode)"
   default     = "medical/dev/mcp-api-keys"
 }
+
+variable "redshift_query_timeout" {
+  type        = number
+  description = "Seconds the service waits for a Redshift statement before cancelling. Must accommodate Serverless cold-start/first-compile (observed 200-500s) and be <= alb_idle_timeout."
+  default     = 300
+}
+
+variable "alb_idle_timeout" {
+  type        = number
+  description = "ALB idle timeout (s). Must be >= redshift_query_timeout because MCP json_response sends no bytes until the query completes."
+  default     = 300
+}
